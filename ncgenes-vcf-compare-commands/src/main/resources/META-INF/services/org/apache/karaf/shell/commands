@@ -1,0 +1,3 @@
+edu.unc.mapseq.commands.ncgenes.vcfcompare.RegisterToIRODSAction
+edu.unc.mapseq.commands.ncgenes.vcfcompare.RunWorkflowAction
+edu.unc.mapseq.commands.ncgenes.vcfcompare.SaveCollectHsMetricsAttributesAction
