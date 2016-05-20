@@ -4,8 +4,6 @@
     <bundle>mvn:edu.unc.mapseq.pipelines.ncgenes-vcf-compare/ncgenes-vcf-compare-commons/${project.version}</bundle>
     <bundle>mvn:edu.unc.mapseq.pipelines.ncgenes-vcf-compare/ncgenes-vcf-compare-workflow/${project.version}</bundle>
     <bundle>mvn:edu.unc.mapseq.pipelines.ncgenes-vcf-compare/ncgenes-vcf-compare-commands/${project.version}</bundle>
-    <bundle>mvn:edu.unc.mapseq.pipelines.ncgenes-vcf-compare/ncgenes-vcf-compare-ws-api/${project.version}</bundle>
-    <bundle>mvn:edu.unc.mapseq.pipelines.ncgenes-vcf-compare/ncgenes-vcf-compare-ws-impl/${project.version}</bundle>    
     <bundle start-level="100">mvn:edu.unc.mapseq.pipelines.ncgenes-vcf-compare/ncgenes-vcf-compare-executor/${project.version}</bundle>
     <bundle start-level="100">mvn:edu.unc.mapseq.pipelines.ncgenes-vcf-compare/ncgenes-vcf-compare-messaging/${project.version}</bundle>
   </feature>
