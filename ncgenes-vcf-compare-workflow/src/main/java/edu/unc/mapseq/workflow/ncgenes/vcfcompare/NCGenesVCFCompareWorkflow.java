@@ -210,8 +210,7 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
 
                 // new job
                 builder = SequencingWorkflowJobFactory
-                        .createJob(++count, SureSelectTriggerSplitterCLI.class, attempt.getId(), sample.getId()).siteName(siteName)
-                        .initialDirectory(workflowDirectory.getAbsolutePath());
+                        .createJob(++count, SureSelectTriggerSplitterCLI.class, attempt.getId(), sample.getId()).siteName(siteName);
                 File ploidyFile = new File(workflowDirectory, String.format("%s.ploidy.bed", participantId));
                 builder.addArgument(SureSelectTriggerSplitterCLI.GENDER, gender)
                         .addArgument(SureSelectTriggerSplitterCLI.INTERVALLIST, targetIntervalList)
@@ -219,7 +218,8 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                         .addArgument(SureSelectTriggerSplitterCLI.NUMBEROFSUBSETS, numberOfFreeBayesSubsets)
                         .addArgument(SureSelectTriggerSplitterCLI.PAR1COORDINATE, par1Coordinate)
                         .addArgument(SureSelectTriggerSplitterCLI.PAR2COORDINATE, par2Coordinate)
-                        .addArgument(SureSelectTriggerSplitterCLI.OUTPUTPREFIX, String.format("%s_Trg", participantId));
+                        .addArgument(SureSelectTriggerSplitterCLI.OUTPUTPREFIX,
+                                String.format("%s/%s_Trg", workflowDirectory.getAbsolutePath(), participantId));
                 CondorJob sureSelectTriggerSplitterJob = builder.build();
                 logger.info(sureSelectTriggerSplitterJob.toString());
                 graph.addVertex(sureSelectTriggerSplitterJob);
