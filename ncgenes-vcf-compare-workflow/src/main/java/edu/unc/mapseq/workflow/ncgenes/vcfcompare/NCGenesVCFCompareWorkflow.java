@@ -110,6 +110,9 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
             File tmpDirectory = new File(workflowDirectory, "tmp");
             tmpDirectory.mkdirs();
 
+            int idx = sample.getName().lastIndexOf("-");
+            String participantId = idx != -1 ? sample.getName().substring(0, idx) : sample.getName();
+
             List<File> readPairList = SequencingWorkflowUtil.getReadPairList(sample);
             logger.debug("readPairList.size(): {}", readPairList.size());
 
@@ -169,10 +172,10 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                         .addArgument(PicardAddOrReplaceReadGroupsCLI.OUTPUT, fixRGOutput.getAbsolutePath())
                         .addArgument(PicardAddOrReplaceReadGroupsCLI.SORTORDER, PicardSortOrderType.COORDINATE.toString().toLowerCase())
                         .addArgument(PicardAddOrReplaceReadGroupsCLI.READGROUPID, readGroupId)
-                        .addArgument(PicardAddOrReplaceReadGroupsCLI.READGROUPLIBRARY, sample.getName())
+                        .addArgument(PicardAddOrReplaceReadGroupsCLI.READGROUPLIBRARY, participantId)
                         .addArgument(PicardAddOrReplaceReadGroupsCLI.READGROUPPLATFORM, readGroupPlatform)
                         .addArgument(PicardAddOrReplaceReadGroupsCLI.READGROUPPLATFORMUNIT, readGroupId)
-                        .addArgument(PicardAddOrReplaceReadGroupsCLI.READGROUPSAMPLENAME, sample.getName())
+                        .addArgument(PicardAddOrReplaceReadGroupsCLI.READGROUPSAMPLENAME, participantId)
                         .addArgument(PicardAddOrReplaceReadGroupsCLI.READGROUPCENTERNAME, "UNC");
                 CondorJob picardAddOrReplaceReadGroupsJob = builder.build();
                 logger.info(picardAddOrReplaceReadGroupsJob.toString());
@@ -209,14 +212,14 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                 builder = SequencingWorkflowJobFactory
                         .createJob(++count, SureSelectTriggerSplitterCLI.class, attempt.getId(), sample.getId()).siteName(siteName)
                         .initialDirectory(workflowDirectory.getAbsolutePath());
-                File ploidyFile = new File(workflowDirectory, String.format("%s.ploidy.bed", sample.getName()));
+                File ploidyFile = new File(workflowDirectory, String.format("%s.ploidy.bed", participantId));
                 builder.addArgument(SureSelectTriggerSplitterCLI.GENDER, gender)
                         .addArgument(SureSelectTriggerSplitterCLI.INTERVALLIST, targetIntervalList)
-                        .addArgument(SureSelectTriggerSplitterCLI.SUBJECTNAME, sample.getName())
+                        .addArgument(SureSelectTriggerSplitterCLI.SUBJECTNAME, participantId)
                         .addArgument(SureSelectTriggerSplitterCLI.NUMBEROFSUBSETS, numberOfFreeBayesSubsets)
                         .addArgument(SureSelectTriggerSplitterCLI.PAR1COORDINATE, par1Coordinate)
                         .addArgument(SureSelectTriggerSplitterCLI.PAR2COORDINATE, par2Coordinate)
-                        .addArgument(SureSelectTriggerSplitterCLI.OUTPUTPREFIX, String.format("%s_Trg", sample.getName()));
+                        .addArgument(SureSelectTriggerSplitterCLI.OUTPUTPREFIX, String.format("%s_Trg", participantId));
                 CondorJob sureSelectTriggerSplitterJob = builder.build();
                 logger.info(sureSelectTriggerSplitterJob.toString());
                 graph.addVertex(sureSelectTriggerSplitterJob);
@@ -229,8 +232,8 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                     // new job
                     builder = SequencingWorkflowJobFactory.createJob(++count, FreeBayesCLI.class, attempt.getId(), sample.getId())
                             .siteName(siteName);
-                    File freeBayesOutput = new File(workflowDirectory, String.format("%s_Trg.set%d.vcf", sample.getName(), i + 1));
-                    File targetFile = new File(workflowDirectory, String.format("%s_Trg.interval.set%d.bed", sample.getName(), i + 1));
+                    File freeBayesOutput = new File(workflowDirectory, String.format("%s_Trg.set%d.vcf", participantId, i + 1));
+                    File targetFile = new File(workflowDirectory, String.format("%s_Trg.interval.set%d.bed", participantId, i + 1));
                     builder.addArgument(FreeBayesCLI.GENOTYPEQUALITIES).addArgument(FreeBayesCLI.REPORTMONOMORPHIC)
                             .addArgument(FreeBayesCLI.BAM, fixRGOutput.getAbsolutePath())
                             .addArgument(FreeBayesCLI.VCF, freeBayesOutput.getAbsolutePath())
@@ -246,8 +249,8 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
 
                 builder = SequencingWorkflowJobFactory.createJob(++count, MergeVCFCLI.class, attempt.getId(), sample.getId())
                         .siteName(siteName).initialDirectory(workflowDirectory.getAbsolutePath());
-                File mergeVCFOutput = new File(workflowDirectory, String.format("%s.vcf", sample.getName()));
-                builder.addArgument(MergeVCFCLI.INPUT, String.format("%s_Trg.*.vcf", sample.getName()))
+                File mergeVCFOutput = new File(workflowDirectory, String.format("%s.vcf", participantId));
+                builder.addArgument(MergeVCFCLI.INPUT, String.format("%s_Trg.*.vcf", participantId))
                         .addArgument(MergeVCFCLI.WORKDIRECTORY, workflowDirectory.getAbsolutePath())
                         .addArgument(MergeVCFCLI.OUTPUT, mergeVCFOutput.getAbsolutePath());
                 CondorJob mergeVCFJob = builder.build();
