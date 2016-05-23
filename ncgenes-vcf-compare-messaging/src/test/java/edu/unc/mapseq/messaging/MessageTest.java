@@ -34,8 +34,7 @@ public class MessageTest {
 
     @Test
     public void testQueue() {
-        ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(
-                String.format("nio://%s:61616", "152.54.3.109"));
+        ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(String.format("nio://%s:61616", "152.54.3.109"));
         Connection connection = null;
         Session session = null;
         try {
@@ -55,30 +54,12 @@ public class MessageTest {
 
                 generator.writeStartObject();
                 generator.writeStringField("entityType", "Sample");
-                generator.writeStringField("id", "2541643");
-
-                generator.writeArrayFieldStart("attributes");
-
-                generator.writeStartObject();
-                generator.writeStringField("name", "subjectName");
-                generator.writeStringField("value", "NCG_00064");
-                generator.writeEndObject();
-
-                generator.writeEndArray();
+                generator.writeStringField("id", "2531087");
                 generator.writeEndObject();
 
                 generator.writeStartObject();
                 generator.writeStringField("entityType", "WorkflowRun");
-                generator.writeStringField("name", "jdr-test");
-
-                generator.writeArrayFieldStart("attributes");
-
-                generator.writeStartObject();
-                generator.writeStringField("name", "sselProbe");
-                generator.writeStringField("value", "5");
-                generator.writeEndObject();
-
-                generator.writeEndArray();
+                generator.writeStringField("name", "jdr-test-vcf-compare");
                 generator.writeEndObject();
 
                 generator.flush();
@@ -108,8 +89,7 @@ public class MessageTest {
 
     @Test
     public void testEntireFlowcellBySample() throws IOException {
-        ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(
-                String.format("nio://%s:61616", "biodev2.its.unc.edu"));
+        ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(String.format("nio://%s:61616", "biodev2.its.unc.edu"));
         Connection connection = null;
         Session session = null;
         try {
@@ -152,8 +132,7 @@ public class MessageTest {
         QName portQName = new QName("http://ws.mapseq.unc.edu", "SamplePort");
         Service service = Service.create(serviceQName);
         String host = "biodev2.its.unc.edu";
-        service.addPort(portQName, SOAPBinding.SOAP11HTTP_MTOM_BINDING,
-                String.format("http://%s:%d/cxf/SampleService", host, 8181));
+        service.addPort(portQName, SOAPBinding.SOAP11HTTP_MTOM_BINDING, String.format("http://%s:%d/cxf/SampleService", host, 8181));
         SampleService sampleService = service.getPort(SampleService.class);
 
         List<Sample> sampleList = new ArrayList<Sample>();
@@ -166,8 +145,7 @@ public class MessageTest {
         sampleList.addAll(sampleService.findByFlowcellId(192405L));
         sampleList.addAll(sampleService.findByFlowcellId(191192L));
 
-        ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(
-                String.format("nio://%s:61616", "biodev2.its.unc.edu"));
+        ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(String.format("nio://%s:61616", "biodev2.its.unc.edu"));
         Connection connection = null;
         Session session = null;
         try {
@@ -184,8 +162,7 @@ public class MessageTest {
                 }
 
                 Flowcell flowcell = sample.getFlowcell();
-                String message = String.format(format, sample.getId(), flowcell.getName(), sample.getLaneIndex(),
-                        sample.getName());
+                String message = String.format(format, sample.getId(), flowcell.getName(), sample.getLaneIndex(), sample.getName());
                 System.out.println(message);
                 producer.send(session.createTextMessage(message));
             }
