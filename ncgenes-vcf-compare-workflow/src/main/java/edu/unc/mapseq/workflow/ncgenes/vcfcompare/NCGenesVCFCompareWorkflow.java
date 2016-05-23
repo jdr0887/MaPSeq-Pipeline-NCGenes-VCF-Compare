@@ -102,7 +102,7 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                 throw new WorkflowException("subjectName is empty");
             }
 
-            Integer numberOfFreeBayesSubsets = 4;
+            Integer numberOfFreeBayesSubsets = 12;
             String gender = "M";
             Set<Attribute> workflowRunAttributeSet = workflowRun.getAttributes();
             if (CollectionUtils.isNotEmpty(workflowRunAttributeSet)) {
@@ -222,8 +222,9 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                 graph.addEdge(samtoolsIndexJob, picardCollectHsMetricsJob);
 
                 // new job
-                builder = SequencingWorkflowJobFactory.createJob(++count, SureSelectTriggerSplitterCLI.class, attempt.getId())
-                        .siteName(siteName).initialDirectory(workflowDirectory.getAbsolutePath());
+                builder = SequencingWorkflowJobFactory
+                        .createJob(++count, SureSelectTriggerSplitterCLI.class, attempt.getId(), sample.getId()).siteName(siteName)
+                        .initialDirectory(workflowDirectory.getAbsolutePath());
                 File ploidyFile = new File(workflowDirectory, String.format("%s.ploidy.bed", subjectName));
                 builder.addArgument(SureSelectTriggerSplitterCLI.GENDER, gender)
                         .addArgument(SureSelectTriggerSplitterCLI.INTERVALLIST, targetIntervalList)
@@ -242,7 +243,8 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                 for (int i = 0; i < numberOfFreeBayesSubsets; i++) {
 
                     // new job
-                    builder = SequencingWorkflowJobFactory.createJob(++count, FreeBayesCLI.class, attempt.getId()).siteName(siteName);
+                    builder = SequencingWorkflowJobFactory.createJob(++count, FreeBayesCLI.class, attempt.getId(), sample.getId())
+                            .siteName(siteName);
                     File freeBayesOutput = new File(workflowDirectory, String.format("%s_Trg.set%d.vcf", subjectName, i + 1));
                     File targetFile = new File(workflowDirectory, String.format("%s_Trg.interval.set%d.bed", subjectName, i + 1));
                     builder.addArgument(FreeBayesCLI.GENOTYPEQUALITIES).addArgument(FreeBayesCLI.REPORTMONOMORPHIC)
@@ -258,8 +260,8 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                     mergeVCFParentJobs.add(freeBayesJob);
                 }
 
-                builder = SequencingWorkflowJobFactory.createJob(++count, MergeVCFCLI.class, attempt.getId()).siteName(siteName)
-                        .initialDirectory(workflowDirectory.getAbsolutePath());
+                builder = SequencingWorkflowJobFactory.createJob(++count, MergeVCFCLI.class, attempt.getId(), sample.getId())
+                        .siteName(siteName).initialDirectory(workflowDirectory.getAbsolutePath());
                 File mergeVCFOutput = new File(workflowDirectory, String.format("%s.vcf", subjectName));
                 builder.addArgument(MergeVCFCLI.INPUT, String.format("%s_Trg.*.vcf", subjectName))
                         .addArgument(MergeVCFCLI.WORKDIRECTORY, workflowDirectory.getAbsolutePath())
