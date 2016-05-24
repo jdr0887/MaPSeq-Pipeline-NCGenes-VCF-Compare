@@ -19,6 +19,7 @@ import edu.unc.mapseq.dao.model.Flowcell;
 import edu.unc.mapseq.dao.model.Sample;
 import edu.unc.mapseq.dao.model.WorkflowRun;
 import edu.unc.mapseq.dao.model.WorkflowRunAttempt;
+import edu.unc.mapseq.module.core.RemoveCLI;
 import edu.unc.mapseq.module.sequencing.bwa.BWAMEMCLI;
 import edu.unc.mapseq.module.sequencing.fastqc.FastQCCLI;
 import edu.unc.mapseq.module.sequencing.fastqc.IgnoreLevelType;
@@ -132,7 +133,7 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                 builder.addArgument(BWAMEMCLI.THREADS, "4").addArgument(BWAMEMCLI.VERBOSITY, "1")
                         .addArgument(BWAMEMCLI.FASTADB, referenceSequence).addArgument(BWAMEMCLI.FASTQ1, r1FastqFile.getAbsolutePath())
                         .addArgument(BWAMEMCLI.FASTQ2, r2FastqFile.getAbsolutePath())
-                        .addArgument(BWAMEMCLI.OUTFILE, bwaMemOutFile.getAbsolutePath());
+                        .addArgument(BWAMEMCLI.OUTFILE, bwaMemOutFile.getAbsolutePath()).addArgument(BWAMEMCLI.MARKSHORTERSPLITHITS);
                 CondorJob bwaMemJob = builder.build();
                 logger.info(bwaMemJob.toString());
                 graph.addVertex(bwaMemJob);
@@ -160,15 +161,13 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                 graph.addEdge(bwaMemJob, picardAddOrReplaceReadGroupsJob);
 
                 // new job
-                builder = SequencingWorkflowJobFactory.createJob(++count, SAMToolsIndexCLI.class, attempt.getId(), sample.getId())
+                builder = SequencingWorkflowJobFactory.createJob(++count, RemoveCLI.class, attempt.getId(), sample.getId())
                         .siteName(siteName);
-                File picardAddOrReplaceReadGroupsIndexOut = new File(workflowDirectory, fixRGOutput.getName().replace(".bam", ".bai"));
-                builder.addArgument(SAMToolsIndexCLI.INPUT, fixRGOutput.getAbsolutePath()).addArgument(SAMToolsIndexCLI.OUTPUT,
-                        picardAddOrReplaceReadGroupsIndexOut.getAbsolutePath());
-                CondorJob samtoolsIndexJob = builder.build();
-                logger.info(samtoolsIndexJob.toString());
-                graph.addVertex(samtoolsIndexJob);
-                graph.addEdge(picardAddOrReplaceReadGroupsJob, samtoolsIndexJob);
+                builder.addArgument(RemoveCLI.FILE, bwaMemOutFile.getAbsolutePath());
+                CondorJob removeJob = builder.build();
+                logger.info(removeJob.toString());
+                graph.addVertex(removeJob);
+                graph.addEdge(picardAddOrReplaceReadGroupsJob, removeJob);
 
                 // new job
                 builder = SequencingWorkflowJobFactory.createJob(++count, PicardCollectHsMetricsCLI.class, attempt.getId(), sample.getId())
@@ -182,7 +181,7 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                 CondorJob picardCollectHsMetricsJob = builder.build();
                 logger.info(picardCollectHsMetricsJob.toString());
                 graph.addVertex(picardCollectHsMetricsJob);
-                graph.addEdge(samtoolsIndexJob, picardCollectHsMetricsJob);
+                graph.addEdge(bwaMemJob, picardCollectHsMetricsJob);
 
                 // new job
                 builder = SequencingWorkflowJobFactory.createJob(++count, FreeBayesCLI.class, attempt.getId(), sample.getId())
@@ -195,7 +194,7 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                 CondorJob freeBayesJob = builder.build();
                 logger.info(freeBayesJob.toString());
                 graph.addVertex(freeBayesJob);
-                graph.addEdge(samtoolsIndexJob, freeBayesJob);
+                graph.addEdge(bwaMemJob, freeBayesJob);
 
             } catch (Exception e) {
                 throw new WorkflowException(e);
