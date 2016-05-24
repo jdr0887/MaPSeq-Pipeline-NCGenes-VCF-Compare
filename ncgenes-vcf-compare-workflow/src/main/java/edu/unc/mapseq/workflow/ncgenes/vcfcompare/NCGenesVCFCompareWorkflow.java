@@ -1,7 +1,6 @@
 package edu.unc.mapseq.workflow.ncgenes.vcfcompare;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
 import java.util.Set;
@@ -22,7 +21,6 @@ import edu.unc.mapseq.dao.model.Flowcell;
 import edu.unc.mapseq.dao.model.Sample;
 import edu.unc.mapseq.dao.model.WorkflowRun;
 import edu.unc.mapseq.dao.model.WorkflowRunAttempt;
-import edu.unc.mapseq.module.sequencing.SureSelectTriggerSplitterCLI;
 import edu.unc.mapseq.module.sequencing.bwa.BWAMEMCLI;
 import edu.unc.mapseq.module.sequencing.fastqc.FastQCCLI;
 import edu.unc.mapseq.module.sequencing.fastqc.IgnoreLevelType;
@@ -31,7 +29,6 @@ import edu.unc.mapseq.module.sequencing.picard.PicardSortOrderType;
 import edu.unc.mapseq.module.sequencing.picard2.PicardAddOrReplaceReadGroupsCLI;
 import edu.unc.mapseq.module.sequencing.picard2.PicardCollectHsMetricsCLI;
 import edu.unc.mapseq.module.sequencing.samtools.SAMToolsIndexCLI;
-import edu.unc.mapseq.module.sequencing.vcflib.MergeVCFCLI;
 import edu.unc.mapseq.workflow.WorkflowException;
 import edu.unc.mapseq.workflow.sequencing.AbstractSequencingWorkflow;
 import edu.unc.mapseq.workflow.sequencing.SequencingWorkflowJobFactory;
@@ -71,8 +68,7 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
         String siteName = getWorkflowBeanService().getAttributes().get("siteName");
         String referenceSequence = getWorkflowBeanService().getAttributes().get("referenceSequence");
         String readGroupPlatform = getWorkflowBeanService().getAttributes().get("readGroupPlatform");
-        String par1Coordinate = getWorkflowBeanService().getAttributes().get("par1Coordinate");
-        String par2Coordinate = getWorkflowBeanService().getAttributes().get("par2Coordinate");
+        String bed = getWorkflowBeanService().getAttributes().get("bed");
         String baitIntervalList = getWorkflowBeanService().getAttributes().get("baitIntervalList");
         String targetIntervalList = getWorkflowBeanService().getAttributes().get("targetIntervalList");
 
@@ -86,24 +82,6 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
             }
 
             logger.debug(sample.toString());
-
-            Integer numberOfFreeBayesSubsets = 12;
-            String gender = "M";
-            Set<Attribute> workflowRunAttributeSet = workflowRun.getAttributes();
-            if (CollectionUtils.isNotEmpty(workflowRunAttributeSet)) {
-                for (Attribute attribute : workflowRunAttributeSet) {
-                    if ("gender".equalsIgnoreCase(attribute.getName())) {
-                        gender = attribute.getValue();
-                        break;
-                    }
-                }
-                for (Attribute attribute : workflowRunAttributeSet) {
-                    if ("freeBayesJobCount".equalsIgnoreCase(attribute.getName())) {
-                        numberOfFreeBayesSubsets = Integer.valueOf(attribute.getValue());
-                        break;
-                    }
-                }
-            }
 
             Flowcell flowcell = sample.getFlowcell();
             File workflowDirectory = new File(sample.getOutputDirectory(), getName());
@@ -202,63 +180,23 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                         .addArgument(PicardCollectHsMetricsCLI.REFERENCESEQUENCE, referenceSequence)
                         .addArgument(PicardCollectHsMetricsCLI.BAITINTERVALS, baitIntervalList)
                         .addArgument(PicardCollectHsMetricsCLI.TARGETINTERVALS, targetIntervalList);
-
                 CondorJob picardCollectHsMetricsJob = builder.build();
                 logger.info(picardCollectHsMetricsJob.toString());
                 graph.addVertex(picardCollectHsMetricsJob);
                 graph.addEdge(samtoolsIndexJob, picardCollectHsMetricsJob);
 
                 // new job
-                builder = SequencingWorkflowJobFactory
-                        .createJob(++count, SureSelectTriggerSplitterCLI.class, attempt.getId(), sample.getId()).siteName(siteName);
-                File ploidyFile = new File(workflowDirectory, String.format("%s.ploidy.bed", participantId));
-                builder.addArgument(SureSelectTriggerSplitterCLI.GENDER, gender)
-                        .addArgument(SureSelectTriggerSplitterCLI.INTERVALLIST, targetIntervalList)
-                        .addArgument(SureSelectTriggerSplitterCLI.SUBJECTNAME, participantId)
-                        .addArgument(SureSelectTriggerSplitterCLI.NUMBEROFSUBSETS, numberOfFreeBayesSubsets)
-                        .addArgument(SureSelectTriggerSplitterCLI.PAR1COORDINATE, par1Coordinate)
-                        .addArgument(SureSelectTriggerSplitterCLI.PAR2COORDINATE, par2Coordinate)
-                        .addArgument(SureSelectTriggerSplitterCLI.OUTPUTPREFIX,
-                                String.format("%s/%s_Trg", workflowDirectory.getAbsolutePath(), participantId));
-                CondorJob sureSelectTriggerSplitterJob = builder.build();
-                logger.info(sureSelectTriggerSplitterJob.toString());
-                graph.addVertex(sureSelectTriggerSplitterJob);
-                graph.addEdge(picardAddOrReplaceReadGroupsJob, sureSelectTriggerSplitterJob);
-
-                List<CondorJob> mergeVCFParentJobs = new ArrayList<CondorJob>();
-
-                for (int i = 0; i < numberOfFreeBayesSubsets; i++) {
-
-                    // new job
-                    builder = SequencingWorkflowJobFactory.createJob(++count, FreeBayesCLI.class, attempt.getId(), sample.getId())
-                            .siteName(siteName);
-                    File freeBayesOutput = new File(workflowDirectory, String.format("%s_Trg.set%d.vcf", participantId, i + 1));
-                    File targetFile = new File(workflowDirectory, String.format("%s_Trg.interval.set%d.bed", participantId, i + 1));
-                    builder.addArgument(FreeBayesCLI.GENOTYPEQUALITIES).addArgument(FreeBayesCLI.REPORTMONOMORPHIC)
-                            .addArgument(FreeBayesCLI.BAM, fixRGOutput.getAbsolutePath())
-                            .addArgument(FreeBayesCLI.VCF, freeBayesOutput.getAbsolutePath())
-                            .addArgument(FreeBayesCLI.FASTAREFERENCE, referenceSequence)
-                            .addArgument(FreeBayesCLI.TARGETS, targetFile.getAbsolutePath())
-                            .addArgument(FreeBayesCLI.COPYNUMBERMAP, ploidyFile.getAbsolutePath());
-                    CondorJob freeBayesJob = builder.build();
-                    logger.info(freeBayesJob.toString());
-                    graph.addVertex(freeBayesJob);
-                    graph.addEdge(sureSelectTriggerSplitterJob, freeBayesJob);
-                    mergeVCFParentJobs.add(freeBayesJob);
-                }
-
-                builder = SequencingWorkflowJobFactory.createJob(++count, MergeVCFCLI.class, attempt.getId(), sample.getId())
-                        .siteName(siteName).initialDirectory(workflowDirectory.getAbsolutePath());
-                File mergeVCFOutput = new File(workflowDirectory, String.format("%s.vcf", participantId));
-                builder.addArgument(MergeVCFCLI.INPUT, String.format("%s_Trg.*.vcf", participantId))
-                        .addArgument(MergeVCFCLI.WORKDIRECTORY, workflowDirectory.getAbsolutePath())
-                        .addArgument(MergeVCFCLI.OUTPUT, mergeVCFOutput.getAbsolutePath());
-                CondorJob mergeVCFJob = builder.build();
-                logger.info(mergeVCFJob.toString());
-                graph.addVertex(mergeVCFJob);
-                for (CondorJob job : mergeVCFParentJobs) {
-                    graph.addEdge(job, mergeVCFJob);
-                }
+                builder = SequencingWorkflowJobFactory.createJob(++count, FreeBayesCLI.class, attempt.getId(), sample.getId())
+                        .siteName(siteName);
+                File freeBayesOutput = new File(workflowDirectory, fixRGOutput.getName().replace(".bam", ".vcf"));
+                builder.addArgument(FreeBayesCLI.GENOTYPEQUALITIES).addArgument(FreeBayesCLI.REPORTMONOMORPHIC)
+                        .addArgument(FreeBayesCLI.TARGETS, bed).addArgument(FreeBayesCLI.BAM, fixRGOutput.getAbsolutePath())
+                        .addArgument(FreeBayesCLI.VCF, freeBayesOutput.getAbsolutePath())
+                        .addArgument(FreeBayesCLI.FASTAREFERENCE, referenceSequence);
+                CondorJob freeBayesJob = builder.build();
+                logger.info(freeBayesJob.toString());
+                graph.addVertex(freeBayesJob);
+                graph.addEdge(samtoolsIndexJob, freeBayesJob);
 
             } catch (Exception e) {
                 throw new WorkflowException(e);
