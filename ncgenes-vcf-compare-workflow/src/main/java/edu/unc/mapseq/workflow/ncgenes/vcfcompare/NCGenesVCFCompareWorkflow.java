@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.ResourceBundle;
 import java.util.Set;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.jgrapht.DirectedGraph;
 import org.jgrapht.Graph;
@@ -16,7 +15,6 @@ import org.renci.jlrm.condor.CondorJobEdge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.unc.mapseq.dao.model.Attribute;
 import edu.unc.mapseq.dao.model.Flowcell;
 import edu.unc.mapseq.dao.model.Sample;
 import edu.unc.mapseq.dao.model.WorkflowRun;
@@ -145,12 +143,13 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                 builder = SequencingWorkflowJobFactory
                         .createJob(++count, PicardAddOrReplaceReadGroupsCLI.class, attempt.getId(), sample.getId()).siteName(siteName);
                 File fixRGOutput = new File(workflowDirectory, bwaMemOutFile.getName().replace(".sam", ".rg.bam"));
-                String readGroupId = String.format("%s-%s.L%03d", flowcell.getName(), sample.getBarcode(), sample.getLaneIndex());
+                String readGroupId = String.format("%s.L%03d", flowcell.getName(), sample.getLaneIndex());
                 builder.addArgument(PicardAddOrReplaceReadGroupsCLI.INPUT, bwaMemOutFile.getAbsolutePath())
                         .addArgument(PicardAddOrReplaceReadGroupsCLI.OUTPUT, fixRGOutput.getAbsolutePath())
                         .addArgument(PicardAddOrReplaceReadGroupsCLI.SORTORDER, PicardSortOrderType.COORDINATE.toString().toLowerCase())
                         .addArgument(PicardAddOrReplaceReadGroupsCLI.READGROUPID, readGroupId)
-                        .addArgument(PicardAddOrReplaceReadGroupsCLI.READGROUPLIBRARY, participantId)
+                        .addArgument(PicardAddOrReplaceReadGroupsCLI.READGROUPLIBRARY,
+                                String.format("%s.%s", participantId, sample.getBarcode()))
                         .addArgument(PicardAddOrReplaceReadGroupsCLI.READGROUPPLATFORM, readGroupPlatform)
                         .addArgument(PicardAddOrReplaceReadGroupsCLI.READGROUPPLATFORMUNIT, readGroupId)
                         .addArgument(PicardAddOrReplaceReadGroupsCLI.READGROUPSAMPLENAME, participantId)
