@@ -12,7 +12,7 @@
 
   <bean id="task" class="edu.unc.mapseq.executor.ncgenes.vcfcompare.NCGenesVCFCompareWorkflowExecutorTask">
     <property name="workflowBeanService" ref="NCGenesVCFCompareWorkflowBeanService" />
-    <property name="workflowName" ref="NCGenesVCFCompare" />
+    <property name="workflowName" value="NCGenesVCFCompare" />
   </bean>
 
   <bean id="NCGenesVCFCompareWorkflowExecutorService" class="edu.unc.mapseq.executor.ncgenes.vcfcompare.NCGenesVCFCompareWorkflowExecutorService"
