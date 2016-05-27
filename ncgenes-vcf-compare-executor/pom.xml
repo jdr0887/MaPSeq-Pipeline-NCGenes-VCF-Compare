@@ -2,13 +2,13 @@
  <parent>
   <groupId>edu.unc.mapseq.pipelines</groupId>
   <artifactId>ncgenes-vcf-compare</artifactId>
-  <version>0.6.12-SNAPSHOT</version>
+  <version>0.6.12</version>
  </parent>
  <name>MaPSeq :: Pipelines :: NCGenes VCF Compare :: Executor</name>
  <modelVersion>4.0.0</modelVersion>
  <groupId>edu.unc.mapseq.pipelines.ncgenes-vcf-compare</groupId>
  <artifactId>ncgenes-vcf-compare-executor</artifactId>
- <version>0.6.12-SNAPSHOT</version>
+ <version>0.6.12</version>
  <packaging>bundle</packaging>
  <dependencies>
   <dependency>
