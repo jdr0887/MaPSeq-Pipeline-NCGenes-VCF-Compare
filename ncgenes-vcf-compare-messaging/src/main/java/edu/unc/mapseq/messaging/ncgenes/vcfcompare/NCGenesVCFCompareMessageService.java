@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 
 public class NCGenesVCFCompareMessageService {
 
-    private final Logger logger = LoggerFactory.getLogger(NCGenesVCFCompareMessageService.class);
+    private static final Logger logger = LoggerFactory.getLogger(NCGenesVCFCompareMessageService.class);
 
     private Connection connection;
 

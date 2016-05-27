@@ -17,7 +17,7 @@ import edu.unc.mapseq.dao.MaPSeqDAOBeanService;
 @Service
 public class SaveCollectHsMetricsAttributesAction implements Action {
 
-    private final Logger logger = LoggerFactory.getLogger(SaveCollectHsMetricsAttributesAction.class);
+    private static final Logger logger = LoggerFactory.getLogger(SaveCollectHsMetricsAttributesAction.class);
 
     @Option(name = "--sampleId", description = "Sample Identifier", required = false, multiValued = false)
     private Long sampleId;
