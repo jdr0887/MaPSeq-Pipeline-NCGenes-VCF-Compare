@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.ResourceBundle;
 import java.util.Set;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.jgrapht.DirectedGraph;
 import org.jgrapht.Graph;
@@ -15,6 +16,7 @@ import org.renci.jlrm.condor.CondorJobEdge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import edu.unc.mapseq.dao.model.Attribute;
 import edu.unc.mapseq.dao.model.Flowcell;
 import edu.unc.mapseq.dao.model.Sample;
 import edu.unc.mapseq.dao.model.WorkflowRun;
@@ -24,6 +26,7 @@ import edu.unc.mapseq.module.sequencing.bwa.BWAMEMCLI;
 import edu.unc.mapseq.module.sequencing.fastqc.FastQCCLI;
 import edu.unc.mapseq.module.sequencing.fastqc.IgnoreLevelType;
 import edu.unc.mapseq.module.sequencing.freebayes.FreeBayesCLI;
+import edu.unc.mapseq.module.sequencing.picard.PicardMarkDuplicatesCLI;
 import edu.unc.mapseq.module.sequencing.picard.PicardSortOrderType;
 import edu.unc.mapseq.module.sequencing.picard2.PicardAddOrReplaceReadGroupsCLI;
 import edu.unc.mapseq.module.sequencing.picard2.PicardCollectHsMetricsCLI;
@@ -72,6 +75,17 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
 
         WorkflowRunAttempt attempt = getWorkflowRunAttempt();
         WorkflowRun workflowRun = attempt.getWorkflowRun();
+
+        Boolean includeMarkDuplicates = Boolean.FALSE;
+        Set<Attribute> attributeSet = workflowRun.getAttributes();
+        if (CollectionUtils.isNotEmpty(attributeSet)) {
+            for (Attribute attribute : attributeSet) {
+                if ("includeMarkDuplicates".equals(attribute.getName()) && attribute.getValue().equalsIgnoreCase("true")) {
+                    includeMarkDuplicates = Boolean.TRUE;
+                    break;
+                }
+            }
+        }
 
         for (Sample sample : sampleSet) {
 
@@ -168,11 +182,30 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                 graph.addVertex(removeJob);
                 graph.addEdge(picardAddOrReplaceReadGroupsJob, removeJob);
 
+                CondorJob picardMarkDuplicatesJob = null;
+                File picardCollectHsMetricsInputFile = fixRGOutput;
+                if (includeMarkDuplicates) {
+                    // new job
+                    builder = SequencingWorkflowJobFactory
+                            .createJob(++count, PicardMarkDuplicatesCLI.class, attempt.getId(), sample.getId()).siteName(siteName);
+                    File picardMarkDuplicatesMetricsFile = new File(workflowDirectory,
+                            fixRGOutput.getName().replace(".bam", ".deduped.metrics"));
+                    File picardMarkDuplicatesOutput = new File(workflowDirectory, fixRGOutput.getName().replace(".bam", ".deduped.bam"));
+                    picardCollectHsMetricsInputFile = picardMarkDuplicatesOutput;
+                    builder.addArgument(PicardMarkDuplicatesCLI.INPUT, fixRGOutput.getAbsolutePath())
+                            .addArgument(PicardMarkDuplicatesCLI.METRICSFILE, picardMarkDuplicatesMetricsFile.getAbsolutePath())
+                            .addArgument(PicardMarkDuplicatesCLI.OUTPUT, picardMarkDuplicatesOutput.getAbsolutePath());
+                    picardMarkDuplicatesJob = builder.build();
+                    logger.info(picardMarkDuplicatesJob.toString());
+                    graph.addVertex(picardMarkDuplicatesJob);
+                    graph.addEdge(picardAddOrReplaceReadGroupsJob, picardMarkDuplicatesJob);
+                }
+
                 // new job
                 builder = SequencingWorkflowJobFactory.createJob(++count, PicardCollectHsMetricsCLI.class, attempt.getId(), sample.getId())
                         .siteName(siteName);
                 File picardCollectHsMetricsFile = new File(workflowDirectory, fixRGOutput.getName().replace(".bam", ".hs.metrics"));
-                builder.addArgument(PicardCollectHsMetricsCLI.INPUT, fixRGOutput.getAbsolutePath())
+                builder.addArgument(PicardCollectHsMetricsCLI.INPUT, picardCollectHsMetricsInputFile.getAbsolutePath())
                         .addArgument(PicardCollectHsMetricsCLI.OUTPUT, picardCollectHsMetricsFile.getAbsolutePath())
                         .addArgument(PicardCollectHsMetricsCLI.REFERENCESEQUENCE, referenceSequence)
                         .addArgument(PicardCollectHsMetricsCLI.BAITINTERVALS, baitIntervalList)
@@ -180,20 +213,24 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                 CondorJob picardCollectHsMetricsJob = builder.build();
                 logger.info(picardCollectHsMetricsJob.toString());
                 graph.addVertex(picardCollectHsMetricsJob);
-                graph.addEdge(bwaMemJob, picardCollectHsMetricsJob);
+                if (picardMarkDuplicatesJob != null) {
+                    graph.addEdge(picardMarkDuplicatesJob, picardCollectHsMetricsJob);
+                } else {
+                    graph.addEdge(picardAddOrReplaceReadGroupsJob, picardCollectHsMetricsJob);
+                }
 
                 // new job
                 builder = SequencingWorkflowJobFactory.createJob(++count, FreeBayesCLI.class, attempt.getId(), sample.getId())
                         .siteName(siteName);
-                File freeBayesOutput = new File(workflowDirectory, fixRGOutput.getName().replace(".bam", ".vcf"));
+                File freeBayesOutput = new File(workflowDirectory, picardCollectHsMetricsInputFile.getName().replace(".bam", ".vcf"));
                 builder.addArgument(FreeBayesCLI.GENOTYPEQUALITIES).addArgument(FreeBayesCLI.REPORTMONOMORPHIC)
-                        .addArgument(FreeBayesCLI.TARGETS, bed).addArgument(FreeBayesCLI.BAM, fixRGOutput.getAbsolutePath())
+                        .addArgument(FreeBayesCLI.TARGETS, bed).addArgument(FreeBayesCLI.BAM, picardCollectHsMetricsInputFile.getAbsolutePath())
                         .addArgument(FreeBayesCLI.VCF, freeBayesOutput.getAbsolutePath())
                         .addArgument(FreeBayesCLI.FASTAREFERENCE, referenceSequence);
                 CondorJob freeBayesJob = builder.build();
                 logger.info(freeBayesJob.toString());
                 graph.addVertex(freeBayesJob);
-                graph.addEdge(bwaMemJob, freeBayesJob);
+                graph.addEdge(picardAddOrReplaceReadGroupsJob, freeBayesJob);
 
             } catch (Exception e) {
                 throw new WorkflowException(e);
