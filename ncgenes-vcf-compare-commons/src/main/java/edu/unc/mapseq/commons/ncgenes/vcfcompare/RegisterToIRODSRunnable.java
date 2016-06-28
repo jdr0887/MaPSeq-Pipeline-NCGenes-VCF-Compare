@@ -2,12 +2,17 @@ package edu.unc.mapseq.commons.ncgenes.vcfcompare;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.osgi.framework.Bundle;
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.FrameworkUtil;
 import org.renci.common.exec.BashExecutor;
 import org.renci.common.exec.CommandInput;
 import org.renci.common.exec.CommandOutput;
@@ -16,14 +21,19 @@ import org.renci.common.exec.ExecutorException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.unc.mapseq.config.MaPSeqConfigurationService;
-import edu.unc.mapseq.config.RunModeType;
 import edu.unc.mapseq.dao.MaPSeqDAOBeanService;
 import edu.unc.mapseq.dao.MaPSeqDAOException;
 import edu.unc.mapseq.dao.SampleDAO;
+import edu.unc.mapseq.dao.model.Attribute;
+import edu.unc.mapseq.dao.model.MimeType;
 import edu.unc.mapseq.dao.model.Sample;
+import edu.unc.mapseq.module.sequencing.fastqc.FastQC;
+import edu.unc.mapseq.module.sequencing.freebayes.FreeBayes;
+import edu.unc.mapseq.module.sequencing.picard.PicardAddOrReplaceReadGroups;
+import edu.unc.mapseq.module.sequencing.picard.PicardMarkDuplicates;
+import edu.unc.mapseq.module.sequencing.picard2.PicardCollectHsMetrics;
+import edu.unc.mapseq.workflow.SystemType;
 import edu.unc.mapseq.workflow.sequencing.IRODSBean;
-import edu.unc.mapseq.workflow.sequencing.SequencingWorkflowUtil;
 
 public class RegisterToIRODSRunnable implements Runnable {
 
@@ -31,21 +41,28 @@ public class RegisterToIRODSRunnable implements Runnable {
 
     private MaPSeqDAOBeanService mapseqDAOBeanService;
 
-    private MaPSeqConfigurationService mapseqConfigurationService;
-
     private Long flowcellId;
 
     private Long sampleId;
 
-    public RegisterToIRODSRunnable() {
+    private SystemType system;
+
+    private String workflowRunName;
+
+    private Boolean includeMarkDuplicates;
+
+    public RegisterToIRODSRunnable(MaPSeqDAOBeanService mapseqDAOBeanService, SystemType system, String workflowRunName,
+            Boolean includeMarkDuplicates) {
         super();
+        this.mapseqDAOBeanService = mapseqDAOBeanService;
+        this.system = system;
+        this.workflowRunName = workflowRunName;
+        this.includeMarkDuplicates = includeMarkDuplicates;
     }
 
     @Override
     public void run() {
         logger.info("ENTERING run()");
-
-        RunModeType runMode = getMapseqConfigurationService().getRunMode();
 
         Set<Sample> sampleSet = new HashSet<Sample>();
         SampleDAO sampleDAO = mapseqDAOBeanService.getSampleDAO();
@@ -71,6 +88,10 @@ public class RegisterToIRODSRunnable implements Runnable {
             }
         }
 
+        BundleContext bundleContext = FrameworkUtil.getBundle(getClass()).getBundleContext();
+        Bundle bundle = bundleContext.getBundle();
+        String version = bundle.getVersion().toString();
+
         for (Sample sample : sampleSet) {
 
             File outputDirectory = new File(sample.getOutputDirectory(), "NCGenesVCFCompare");
@@ -79,32 +100,20 @@ public class RegisterToIRODSRunnable implements Runnable {
                 tmpDir.mkdirs();
             }
 
-            List<File> readPairList = SequencingWorkflowUtil.getReadPairList(sample);
-
-            // assumption: a dash is used as a delimiter between a participantId and the external code
-            int idx = sample.getName().lastIndexOf("-");
-            String participantId = idx != -1 ? sample.getName().substring(0, idx) : sample.getName();
-
-            String irodsHome = System.getenv("NCGENESVCFCOMPARE_IRODS_HOME");
-            if (StringUtils.isEmpty(irodsHome)) {
-                logger.error("irodsHome is not set");
-                return;
+            String participantId = null;
+            for (Attribute attribute : sample.getAttributes()) {
+                if ("subjectName".equals(attribute.getName())) {
+                    participantId = attribute.getValue();
+                    break;
+                }
             }
 
-            String ncgenesIRODSDirectory;
-
-            switch (runMode) {
-                case DEV:
-                case STAGING:
-                    ncgenesIRODSDirectory = String.format("/MedGenZone/home/medgenuser/sequence_data/%s/gs/%s",
-                            runMode.toString().toLowerCase(), participantId);
-                    break;
-                case PROD:
-                default:
-                    ncgenesIRODSDirectory = String.format("/MedGenZone/home/medgenuser/sequence_data/gs/%s",
-                            participantId);
-                    break;
+            if (StringUtils.isEmpty(participantId)) {
+                participantId = sample.getName();
             }
+
+            String irodsDirectory = String.format("/MedGenZone/%s/sequencing/ncgenes/analysis/%s/%s/%s", system.getValue(),
+                    sample.getFlowcell().getName(), sample.getName(), "NCGenesVCFCompare");
 
             CommandOutput commandOutput = null;
 
@@ -113,71 +122,59 @@ public class RegisterToIRODSRunnable implements Runnable {
             CommandInput commandInput = new CommandInput();
             commandInput.setExitImmediately(Boolean.FALSE);
             StringBuilder sb = new StringBuilder();
-            sb.append(String.format("%s/bin/imkdir -p %s%n", irodsHome, ncgenesIRODSDirectory));
-            sb.append(String.format("%s/bin/imeta add -C %s Project GS%n", irodsHome, ncgenesIRODSDirectory));
-            sb.append(String.format("%s/bin/imeta add -C %s ParticipantID %s GS%n", irodsHome, ncgenesIRODSDirectory,
-                    participantId));
+            sb.append(String.format("$IRODS_HOME/imkdir -p %s%n", irodsDirectory));
             commandInput.setCommand(sb.toString());
             commandInput.setWorkDir(tmpDir);
             commandInputList.add(commandInput);
 
             List<IRODSBean> files2RegisterToIRODS = new ArrayList<IRODSBean>();
 
-            File r1FastqFile = readPairList.get(0);
-            String r1FastqRootName = SequencingWorkflowUtil.getRootFastqName(r1FastqFile.getName());
-            files2RegisterToIRODS.add(new IRODSBean(r1FastqFile, "fastq", null, null, runMode));
+            List<ImmutablePair<String, String>> attributeList = Arrays.asList(
+                    new ImmutablePair<String, String>("ParticipantId", participantId),
+                    new ImmutablePair<String, String>("MaPSeqWorkflowVersion", version),
+                    new ImmutablePair<String, String>("MaPSeqWorkflowName", "NCGenesVCFCompare"),
+                    new ImmutablePair<String, String>("MaPSeqStudyName", sample.getStudy().getName()),
+                    new ImmutablePair<String, String>("MaPSeqSampleId", sample.getId().toString()),
+                    new ImmutablePair<String, String>("MaPSeqSystem", system.getValue()),
+                    new ImmutablePair<String, String>("MaPSeqFlowcellId", sample.getFlowcell().getId().toString()));
 
-            File r2FastqFile = readPairList.get(1);
-            files2RegisterToIRODS.add(new IRODSBean(r2FastqFile, "fastq", null, null, runMode));
-
-            File samOutFile = new File(outputDirectory, r1FastqRootName + ".sam");
-
-            File samSortOutFile = new File(outputDirectory, samOutFile.getName().replace(".sam", ".bam"));
-            File picardMarkDuplicatesOutput = new File(outputDirectory,
-                    samSortOutFile.getName().replace(".bam", ".deduped.bam"));
-            files2RegisterToIRODS
-                    .add(new IRODSBean(picardMarkDuplicatesOutput, "PicardMarkDuplicatesBAM", null, null, runMode));
-
-            File picardBuildBAMIndexFile = new File(outputDirectory,
-                    picardMarkDuplicatesOutput.getName().replace(".bam", ".bai"));
-
-            files2RegisterToIRODS
-                    .add(new IRODSBean(picardBuildBAMIndexFile, "PicardMarkDuplicatesBAMIndex", null, null, runMode));
-            File fixRGOutput = new File(outputDirectory,
-                    picardMarkDuplicatesOutput.getName().replace(".bam", ".rg.bam"));
+            List<ImmutablePair<String, String>> attributeListWithJob = new ArrayList<>(attributeList);
+            attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqJobName", FastQC.class.getSimpleName()));
+            attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqMimeType", MimeType.APPLICATION_ZIP.toString()));
             files2RegisterToIRODS.add(
-                    new IRODSBean(picardBuildBAMIndexFile, "PicardAddOrReplaceReadGroupsBAM", null, null, runMode));
+                    new IRODSBean(new File(outputDirectory, String.format("%s.r1.fastqc.zip", workflowRunName)), attributeListWithJob));
 
-            File picardReorderSAMOut = new File(outputDirectory, fixRGOutput.getName().replace(".bam", ".ordered.bam"));
+            attributeListWithJob = new ArrayList<>(attributeList);
+            attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqJobName", FastQC.class.getSimpleName()));
+            attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqMimeType", MimeType.APPLICATION_ZIP.toString()));
+            files2RegisterToIRODS.add(
+                    new IRODSBean(new File(outputDirectory, String.format("%s.r2.fastqc.zip", workflowRunName)), attributeListWithJob));
 
-            files2RegisterToIRODS.add(new IRODSBean(
-                    new File(outputDirectory,
-                            picardReorderSAMOut.getName().replace(".bam",
-                                    ".coverage.sample_cumulative_coverage_counts")),
-                    "CoverageCounts", null, null, runMode));
-            files2RegisterToIRODS.add(new IRODSBean(
-                    new File(outputDirectory,
-                            picardReorderSAMOut.getName().replace(".bam",
-                                    ".coverage.sample_cumulative_coverage_proportions")),
-                    "CoverageProportions", null, null, runMode));
-            files2RegisterToIRODS
-                    .add(new IRODSBean(
-                            new File(outputDirectory,
-                                    picardReorderSAMOut.getName().replace(".bam",
-                                            ".coverage.sample_interval_statistics")),
-                            "IntervalStatistics", null, null, runMode));
-            files2RegisterToIRODS.add(new IRODSBean(
-                    new File(outputDirectory,
-                            picardReorderSAMOut.getName().replace(".bam", ".coverage.sample_interval_summary")),
-                    "IntervalSummary", null, null, runMode));
-            files2RegisterToIRODS.add(new IRODSBean(
-                    new File(outputDirectory,
-                            picardReorderSAMOut.getName().replace(".bam", ".coverage.sample_statistics")),
-                    "SampleStatistics", null, null, runMode));
-            files2RegisterToIRODS.add(new IRODSBean(
-                    new File(outputDirectory,
-                            picardReorderSAMOut.getName().replace(".bam", ".coverage.sample_summary")),
-                    "SampleSummary", null, null, runMode));
+            String file = String.format("%s.rg.bam", workflowRunName);
+
+            attributeListWithJob = new ArrayList<>(attributeList);
+            attributeListWithJob
+                    .add(new ImmutablePair<String, String>("MaPSeqJobName", PicardAddOrReplaceReadGroups.class.getSimpleName()));
+            attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqMimeType", MimeType.APPLICATION_BAM.toString()));
+            files2RegisterToIRODS.add(new IRODSBean(new File(outputDirectory, file), attributeListWithJob));
+
+            if (includeMarkDuplicates) {
+                file = String.format("%s.rg.deduped.bam", workflowRunName);
+                attributeListWithJob = new ArrayList<>(attributeList);
+                attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqJobName", PicardMarkDuplicates.class.getSimpleName()));
+                attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqMimeType", MimeType.APPLICATION_BAM.toString()));
+                files2RegisterToIRODS.add(new IRODSBean(new File(outputDirectory, file), attributeListWithJob));
+            }
+
+            attributeListWithJob = new ArrayList<>(attributeList);
+            attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqJobName", PicardCollectHsMetrics.class.getSimpleName()));
+            attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqMimeType", MimeType.TEXT_PLAIN.toString()));
+            files2RegisterToIRODS.add(new IRODSBean(new File(outputDirectory, file.replace(".bam", ".hs.metrics")), attributeListWithJob));
+
+            attributeListWithJob = new ArrayList<>(attributeList);
+            attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqJobName", FreeBayes.class.getSimpleName()));
+            attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqMimeType", MimeType.TEXT_VCF.toString()));
+            files2RegisterToIRODS.add(new IRODSBean(new File(outputDirectory, file.replace(".bam", ".vcf")), attributeListWithJob));
 
             for (IRODSBean bean : files2RegisterToIRODS) {
 
@@ -191,13 +188,11 @@ public class RegisterToIRODSRunnable implements Runnable {
                 }
 
                 StringBuilder registerCommandSB = new StringBuilder();
-                String registrationCommand = String.format("%s/bin/ireg -f %s %s/%s", irodsHome,
-                        bean.getFile().getAbsolutePath(), ncgenesIRODSDirectory, bean.getFile().getName());
-                String deRegistrationCommand = String.format("%s/bin/irm -U %s/%s", irodsHome, ncgenesIRODSDirectory,
+                String registrationCommand = String.format("$IRODS_HOME/ireg -f %s %s/%s", bean.getFile().getAbsolutePath(), irodsDirectory,
                         bean.getFile().getName());
+                String deRegistrationCommand = String.format("$IRODS_HOME/irm -U %s/%s", irodsDirectory, bean.getFile().getName());
                 registerCommandSB.append(registrationCommand).append("\n");
-                registerCommandSB.append(
-                        String.format("if [ $? != 0 ]; then %s; %s; fi%n", deRegistrationCommand, registrationCommand));
+                registerCommandSB.append(String.format("if [ $? != 0 ]; then %s; %s; fi%n", deRegistrationCommand, registrationCommand));
                 commandInput.setCommand(registerCommandSB.toString());
                 commandInput.setWorkDir(tmpDir);
                 commandInputList.add(commandInput);
@@ -205,12 +200,10 @@ public class RegisterToIRODSRunnable implements Runnable {
                 commandInput = new CommandInput();
                 commandInput.setExitImmediately(Boolean.FALSE);
                 sb = new StringBuilder();
-                sb.append(String.format("%s/bin/imeta add -d %s/%s ParticipantID %s GS%n", irodsHome,
-                        ncgenesIRODSDirectory, bean.getFile().getName(), participantId));
-                sb.append(String.format("%s/bin/imeta add -d %s/%s FileType %s GS%n", irodsHome, ncgenesIRODSDirectory,
-                        bean.getFile().getName(), bean.getType()));
-                sb.append(String.format("%s/bin/imeta add -d %s/%s System %s GS%n", irodsHome, ncgenesIRODSDirectory,
-                        bean.getFile().getName(), StringUtils.capitalize(bean.getRunMode().toString().toLowerCase())));
+                for (ImmutablePair<String, String> attribute : bean.getAttributes()) {
+                    sb.append(String.format("$IRODS_HOME/imeta add -d %s/%s %s %s NCGenes%n", irodsDirectory, bean.getFile().getName(),
+                            attribute.getLeft(), attribute.getRight()));
+                }
                 commandInput.setCommand(sb.toString());
                 commandInput.setWorkDir(tmpDir);
                 commandInputList.add(commandInput);
@@ -236,8 +229,6 @@ public class RegisterToIRODSRunnable implements Runnable {
                 }
             }
 
-            logger.info("FINISHED PROCESSING: {}", sample.toString());
-
         }
 
     }
@@ -248,14 +239,6 @@ public class RegisterToIRODSRunnable implements Runnable {
 
     public void setMapseqDAOBeanService(MaPSeqDAOBeanService mapseqDAOBeanService) {
         this.mapseqDAOBeanService = mapseqDAOBeanService;
-    }
-
-    public MaPSeqConfigurationService getMapseqConfigurationService() {
-        return mapseqConfigurationService;
-    }
-
-    public void setMapseqConfigurationService(MaPSeqConfigurationService mapseqConfigurationService) {
-        this.mapseqConfigurationService = mapseqConfigurationService;
     }
 
     public Long getSampleId() {
@@ -272,6 +255,30 @@ public class RegisterToIRODSRunnable implements Runnable {
 
     public void setFlowcellId(Long flowcellId) {
         this.flowcellId = flowcellId;
+    }
+
+    public SystemType getSystem() {
+        return system;
+    }
+
+    public void setSystem(SystemType system) {
+        this.system = system;
+    }
+
+    public String getWorkflowRunName() {
+        return workflowRunName;
+    }
+
+    public void setWorkflowRunName(String workflowRunName) {
+        this.workflowRunName = workflowRunName;
+    }
+
+    public Boolean getIncludeMarkDuplicates() {
+        return includeMarkDuplicates;
+    }
+
+    public void setIncludeMarkDuplicates(Boolean includeMarkDuplicates) {
+        this.includeMarkDuplicates = includeMarkDuplicates;
     }
 
 }
