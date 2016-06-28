@@ -2,11 +2,9 @@ package edu.unc.mapseq.workflow.ncgenes.vcfcompare;
 
 import java.io.File;
 import java.util.List;
-import java.util.ResourceBundle;
 import java.util.Set;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.StringUtils;
 import org.jgrapht.DirectedGraph;
 import org.jgrapht.Graph;
 import org.jgrapht.graph.DefaultDirectedGraph;
@@ -30,6 +28,7 @@ import edu.unc.mapseq.module.sequencing.picard.PicardMarkDuplicatesCLI;
 import edu.unc.mapseq.module.sequencing.picard.PicardSortOrderType;
 import edu.unc.mapseq.module.sequencing.picard2.PicardAddOrReplaceReadGroupsCLI;
 import edu.unc.mapseq.module.sequencing.picard2.PicardCollectHsMetricsCLI;
+import edu.unc.mapseq.workflow.SystemType;
 import edu.unc.mapseq.workflow.WorkflowException;
 import edu.unc.mapseq.workflow.sequencing.AbstractSequencingWorkflow;
 import edu.unc.mapseq.workflow.sequencing.SequencingWorkflowJobFactory;
@@ -49,10 +48,8 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
     }
 
     @Override
-    public String getVersion() {
-        ResourceBundle bundle = ResourceBundle.getBundle("edu/unc/mapseq/workflow/ncgenes/vcfcompare/workflow");
-        String version = bundle.getString("version");
-        return StringUtils.isNotEmpty(version) ? version : "0.1.0-SNAPSHOT";
+    public SystemType getSystem() {
+        return SystemType.EXPERIMENTAL;
     }
 
     @Override
@@ -224,7 +221,8 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                         .siteName(siteName);
                 File freeBayesOutput = new File(workflowDirectory, picardCollectHsMetricsInputFile.getName().replace(".bam", ".vcf"));
                 builder.addArgument(FreeBayesCLI.GENOTYPEQUALITIES).addArgument(FreeBayesCLI.REPORTMONOMORPHIC)
-                        .addArgument(FreeBayesCLI.TARGETS, bed).addArgument(FreeBayesCLI.BAM, picardCollectHsMetricsInputFile.getAbsolutePath())
+                        .addArgument(FreeBayesCLI.TARGETS, bed)
+                        .addArgument(FreeBayesCLI.BAM, picardCollectHsMetricsInputFile.getAbsolutePath())
                         .addArgument(FreeBayesCLI.VCF, freeBayesOutput.getAbsolutePath())
                         .addArgument(FreeBayesCLI.FASTAREFERENCE, referenceSequence);
                 CondorJob freeBayesJob = builder.build();
