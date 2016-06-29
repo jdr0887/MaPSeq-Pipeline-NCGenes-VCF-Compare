@@ -112,8 +112,8 @@ public class RegisterToIRODSRunnable implements Runnable {
                 participantId = sample.getName();
             }
 
-            String irodsDirectory = String.format("/MedGenZone/%s/sequencing/ncgenes/analysis/%s/%s/%s", system.getValue(),
-                    sample.getFlowcell().getName(), sample.getName(), "NCGenesVCFCompare");
+            String irodsDirectory = String.format("/MedGenZone/%s/sequencing/ncgenes/analysis/%s/L%03d_%s/%s", system.getValue(),
+                    sample.getFlowcell().getName(), sample.getLaneIndex(), sample.getBarcode(), "NCGenesVCFCompare");
 
             CommandOutput commandOutput = null;
 
