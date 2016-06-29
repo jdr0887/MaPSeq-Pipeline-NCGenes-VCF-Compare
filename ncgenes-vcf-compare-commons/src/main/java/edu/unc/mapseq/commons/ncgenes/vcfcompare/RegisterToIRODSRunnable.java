@@ -100,17 +100,8 @@ public class RegisterToIRODSRunnable implements Runnable {
                 tmpDir.mkdirs();
             }
 
-            String participantId = null;
-            for (Attribute attribute : sample.getAttributes()) {
-                if ("subjectName".equals(attribute.getName())) {
-                    participantId = attribute.getValue();
-                    break;
-                }
-            }
-
-            if (StringUtils.isEmpty(participantId)) {
-                participantId = sample.getName();
-            }
+            int idx = sample.getName().lastIndexOf("-");
+            String participantId = idx != -1 ? sample.getName().substring(0, idx) : sample.getName();
 
             String irodsDirectory = String.format("/MedGenZone/%s/sequencing/ncgenes/analysis/%s/L%03d_%s/%s", system.getValue(),
                     sample.getFlowcell().getName(), sample.getLaneIndex(), sample.getBarcode(), "NCGenesVCFCompare");
