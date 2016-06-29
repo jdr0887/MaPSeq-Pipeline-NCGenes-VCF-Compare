@@ -235,8 +235,11 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                 CondorJob freeBayesJob = builder.build();
                 logger.info(freeBayesJob.toString());
                 graph.addVertex(freeBayesJob);
-                graph.addEdge(picardAddOrReplaceReadGroupsJob, freeBayesJob);
-
+                if (picardMarkDuplicatesJob != null) {
+                    graph.addEdge(picardMarkDuplicatesJob, freeBayesJob);
+                } else {
+                    graph.addEdge(picardAddOrReplaceReadGroupsJob, freeBayesJob);
+                }
             } catch (Exception e) {
                 throw new WorkflowException(e);
             }
