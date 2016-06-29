@@ -208,7 +208,7 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                 // new job
                 builder = SequencingWorkflowJobFactory.createJob(++count, PicardCollectHsMetricsCLI.class, attempt.getId(), sample.getId())
                         .siteName(siteName);
-                File picardCollectHsMetricsFile = new File(workflowDirectory, fixRGOutput.getName().replace(".bam", ".hs.metrics"));
+                File picardCollectHsMetricsFile = new File(workflowDirectory, picardCollectHsMetricsInputFile.getName().replace(".bam", ".hs.metrics"));
                 builder.addArgument(PicardCollectHsMetricsCLI.INPUT, picardCollectHsMetricsInputFile.getAbsolutePath())
                         .addArgument(PicardCollectHsMetricsCLI.OUTPUT, picardCollectHsMetricsFile.getAbsolutePath())
                         .addArgument(PicardCollectHsMetricsCLI.REFERENCESEQUENCE, referenceSequence)
