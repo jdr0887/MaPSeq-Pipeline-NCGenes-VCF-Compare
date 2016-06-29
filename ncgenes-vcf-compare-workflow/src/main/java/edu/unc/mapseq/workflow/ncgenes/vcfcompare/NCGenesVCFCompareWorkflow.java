@@ -3,6 +3,9 @@ package edu.unc.mapseq.workflow.ncgenes.vcfcompare;
 import java.io.File;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.jgrapht.DirectedGraph;
@@ -14,6 +17,10 @@ import org.renci.jlrm.condor.CondorJobEdge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import edu.unc.mapseq.commons.ncgenes.vcfcompare.RegisterToIRODSRunnable;
+import edu.unc.mapseq.commons.ncgenes.vcfcompare.SaveCollectHsMetricsAttributesRunnable;
+import edu.unc.mapseq.config.MaPSeqConfigurationService;
+import edu.unc.mapseq.dao.MaPSeqDAOBeanService;
 import edu.unc.mapseq.dao.model.Attribute;
 import edu.unc.mapseq.dao.model.Flowcell;
 import edu.unc.mapseq.dao.model.Sample;
@@ -238,39 +245,47 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
         return graph;
     }
 
-    // @Override
-    // public void postRun() throws WorkflowException {
-    // logger.info("ENTERING postRun()");
-    //
-    // Set<Sample> sampleSet = getAggregatedSamples();
-    //
-    // ExecutorService executorService = Executors.newSingleThreadExecutor();
-    //
-    // for (Sample sample : sampleSet) {
-    //
-    // if ("Undetermined".equals(sample.getBarcode())) {
-    // continue;
-    // }
-    //
-    // MaPSeqDAOBeanService daoBean = getWorkflowBeanService().getMaPSeqDAOBeanService();
-    // MaPSeqConfigurationService configService = getWorkflowBeanService().getMaPSeqConfigurationService();
-    //
-    // RegisterToIRODSRunnable registerToIRODSRunnable = new RegisterToIRODSRunnable();
-    // registerToIRODSRunnable.setMapseqDAOBean(daoBean);
-    // registerToIRODSRunnable.setMapseqConfigurationService(configService);
-    // registerToIRODSRunnable.setSampleId(sample.getId());
-    // executorService.submit(registerToIRODSRunnable);
-    //
-    // SaveCollectHsMetricsAttributesRunnable saveCollectHsMetricsAttributesRunnable = new
-    // SaveCollectHsMetricsAttributesRunnable();
-    // saveCollectHsMetricsAttributesRunnable.setMapseqDAOBeanService(daoBean);
-    // saveCollectHsMetricsAttributesRunnable.setSampleId(sample.getId());
-    // executorService.submit(saveCollectHsMetricsAttributesRunnable);
-    //
-    // }
-    //
-    // executorService.shutdown();
-    //
-    // }
+    @Override
+    public void postRun() throws WorkflowException {
+        logger.debug("ENTERING postRun()");
+
+        Set<Sample> sampleSet = getAggregatedSamples();
+
+        WorkflowRun workflowRun = getWorkflowRunAttempt().getWorkflowRun();
+        Boolean includeMarkDuplicates = Boolean.FALSE;
+        Set<Attribute> attributeSet = workflowRun.getAttributes();
+        if (CollectionUtils.isNotEmpty(attributeSet)) {
+            for (Attribute attribute : attributeSet) {
+                if ("includeMarkDuplicates".equals(attribute.getName()) && attribute.getValue().equalsIgnoreCase("true")) {
+                    includeMarkDuplicates = Boolean.TRUE;
+                    break;
+                }
+            }
+        }
+
+        MaPSeqDAOBeanService daoBean = getWorkflowBeanService().getMaPSeqDAOBeanService();
+
+        try {
+            ExecutorService es = Executors.newSingleThreadExecutor();
+            for (Sample sample : sampleSet) {
+
+                if ("Undetermined".equals(sample.getBarcode())) {
+                    continue;
+                }
+
+                RegisterToIRODSRunnable registerToIRODSRunnable = new RegisterToIRODSRunnable(daoBean, getSystem(), workflowRun.getName(),
+                        includeMarkDuplicates);
+                registerToIRODSRunnable.setSampleId(sample.getId());
+                es.submit(registerToIRODSRunnable);
+
+            }
+
+            es.shutdown();
+            es.awaitTermination(1L, TimeUnit.HOURS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+    }
 
 }
