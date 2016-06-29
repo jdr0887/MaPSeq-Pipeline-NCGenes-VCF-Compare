@@ -150,7 +150,7 @@ public class RegisterToIRODSRunnable implements Runnable {
             files2RegisterToIRODS.add(
                     new IRODSBean(new File(outputDirectory, String.format("%s.r2.fastqc.zip", workflowRunName)), attributeListWithJob));
 
-            String file = String.format("%s.rg.bam", workflowRunName);
+            String file = String.format("%s.mem.rg.bam", workflowRunName);
 
             attributeListWithJob = new ArrayList<>(attributeList);
             attributeListWithJob
@@ -159,7 +159,7 @@ public class RegisterToIRODSRunnable implements Runnable {
             files2RegisterToIRODS.add(new IRODSBean(new File(outputDirectory, file), attributeListWithJob));
 
             if (includeMarkDuplicates) {
-                file = String.format("%s.rg.deduped.bam", workflowRunName);
+                file = String.format("%s.mem.rg.deduped.bam", workflowRunName);
                 attributeListWithJob = new ArrayList<>(attributeList);
                 attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqJobName", PicardMarkDuplicates.class.getSimpleName()));
                 attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqMimeType", MimeType.APPLICATION_BAM.toString()));
