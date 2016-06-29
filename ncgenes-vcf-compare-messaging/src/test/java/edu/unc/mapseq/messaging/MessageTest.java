@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
@@ -31,6 +32,82 @@ import edu.unc.mapseq.dao.model.Sample;
 import edu.unc.mapseq.ws.SampleService;
 
 public class MessageTest {
+
+    @Test
+    public void testNCGenesVCFCompare() {
+
+        List<Integer> sampleIdList = Arrays.asList(1825232, 189384, 113042, 1647900, 113037, 1801051, 1647912, 544321, 1647915, 1647903,
+                1801054, 1774596, 1801055, 1801056, 1774598, 1825250, 1801058, 1774503, 1801061, 1940373, 1647921, 1801062, 1774599,
+                1647925, 1801065, 1775337, 1774600, 1647923, 1801069, 1775338, 1801068, 1775339, 1775342, 1801073, 1784692, 1804856,
+                1804852, 1804853, 1918862, 1825247, 1804858, 2069166, 1863420, 1863417, 1887304, 1804842, 1918612, 1825252, 2069162,
+                1863418, 2053703, 2053698, 1918610, 1825235, 1887303, 1825248, 1940363, 1825239, 1940375, 1940359, 2053701, 1940371,
+                1918753, 1940372, 1940352, 2069165, 2069175, 2041809, 2129707, 2041814, 1940353, 1940361, 1940364, 2041810, 2041815,
+                2069152, 1940365, 1918861, 2041811, 2089404, 2089408, 2069168, 2089569, 2089570, 2129705, 2264669, 2069156, 2069157,
+                2069153);
+
+        ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(String.format("nio://%s:61616", "152.54.3.109"));
+        Connection connection = null;
+        Session session = null;
+        try {
+            connection = connectionFactory.createConnection();
+            session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+            Destination destination = session.createQueue("queue/ncgenes.vcf-compare");
+            MessageProducer producer = session.createProducer(destination);
+            producer.setDeliveryMode(DeliveryMode.PERSISTENT);
+
+            // for (Integer sampleId : sampleIdList) {
+
+            Integer sampleId = 1825232;
+            StringWriter sw = new StringWriter();
+
+            JsonGenerator generator = new JsonFactory().createGenerator(sw);
+
+            generator.writeStartObject();
+            generator.writeArrayFieldStart("entities");
+
+            generator.writeStartObject();
+            generator.writeStringField("entityType", "Sample");
+            generator.writeStringField("id", sampleId.toString());
+            generator.writeEndObject();
+
+            generator.writeStartObject();
+            generator.writeStringField("entityType", "WorkflowRun");
+            generator.writeStringField("name", String.format("vcf-compare-%d", sampleId));
+
+            generator.writeArrayFieldStart("attributes");
+
+            generator.writeStartObject();
+            generator.writeStringField("name", "includeMarkDuplicates");
+            generator.writeStringField("value", "true");
+            generator.writeEndObject();
+
+            generator.writeEndArray();
+
+            generator.writeEndObject();
+
+            generator.flush();
+            generator.close();
+
+            sw.flush();
+            sw.close();
+            System.out.println(sw.toString());
+
+            producer.send(session.createTextMessage(sw.toString()));
+
+            // }
+
+        } catch (IOException | JMSException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                session.close();
+                connection.close();
+            } catch (JMSException e) {
+                e.printStackTrace();
+            }
+        }
+
+    }
 
     @Test
     public void testQueue() {
