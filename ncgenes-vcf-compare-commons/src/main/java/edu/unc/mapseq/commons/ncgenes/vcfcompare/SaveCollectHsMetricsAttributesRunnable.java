@@ -23,23 +23,23 @@ import edu.unc.mapseq.dao.MaPSeqDAOException;
 import edu.unc.mapseq.dao.SampleDAO;
 import edu.unc.mapseq.dao.model.Attribute;
 import edu.unc.mapseq.dao.model.Sample;
+import edu.unc.mapseq.dao.model.WorkflowRun;
+import edu.unc.mapseq.workflow.sequencing.SequencingWorkflowUtil;
 
 public class SaveCollectHsMetricsAttributesRunnable implements Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(SaveCollectHsMetricsAttributesRunnable.class);
 
-    private static final List<String> keyList = Arrays.asList("BAIT_SET", "GENOME_SIZE", "BAIT_TERRITORY",
-            "TARGET_TERRITORY", "BAIT_DESIGN_EFFICIENCY", "TOTAL_READS", "PF_READS", "PF_UNIQUE_READS", "PCT_PF_READS",
-            "PCT_PF_UQ_READS PF", "PF_UQ_READS_ALIGNED", "PCT_PF_UQ_READS_ALIGNED", "PF_BASES_ALIGNED",
-            "PF_UQ_BASES_ALIGNED", "ON_BAIT_BASES", "NEAR_BAIT_BASES", "OFF_BAIT_BASES", "ON_TARGET_BASES",
-            "PCT_SELECTED_BASES", "PCT_OFF_BAIT", "ON_BAIT_VS_SELECTED", "MEAN_BAIT_COVERAGE", "MEAN_TARGET_COVERAGE",
-            "MEDIAN_TARGET_COVERAGE", "PCT_USABLE_BASES_ON_BAIT", "PCT_USABLE_BASES_ON_TARGET", "FOLD_ENRICHMENT",
-            "ZERO_CVG_TARGETS_PCT", "PCT_EXC_DUPE", "PCT_EXC_MAPQ", "PCT_EXC_BASEQ", "PCT_EXC_OVERLAP",
-            "PCT_EXC_OFF_TARGET", "FOLD_80_BASE_PENALTY", "PCT_TARGET_BASES_1X", "PCT_TARGET_BASES_2X",
-            "PCT_TARGET_BASES_10X", "PCT_TARGET_BASES_20X", "PCT_TARGET_BASES_30X", "PCT_TARGET_BASES_40X",
-            "PCT_TARGET_BASES_50X", "PCT_TARGET_BASES_100X", "HS_LIBRARY_SIZE", "HS_PENALTY_10X", "HS_PENALTY_20X",
-            "HS_PENALTY_30X", "HS_PENALTY_40X", "HS_PENALTY_50X", "HS_PENALTY_100X", "AT_DROPOUT", "GC_DROPOUT",
-            "HET_SNP_SENSITIVITY", "HET_SNP_Q");
+    private static final List<String> keyList = Arrays.asList("BAIT_SET", "GENOME_SIZE", "BAIT_TERRITORY", "TARGET_TERRITORY",
+            "BAIT_DESIGN_EFFICIENCY", "TOTAL_READS", "PF_READS", "PF_UNIQUE_READS", "PCT_PF_READS", "PCT_PF_UQ_READS PF",
+            "PF_UQ_READS_ALIGNED", "PCT_PF_UQ_READS_ALIGNED", "PF_BASES_ALIGNED", "PF_UQ_BASES_ALIGNED", "ON_BAIT_BASES", "NEAR_BAIT_BASES",
+            "OFF_BAIT_BASES", "ON_TARGET_BASES", "PCT_SELECTED_BASES", "PCT_OFF_BAIT", "ON_BAIT_VS_SELECTED", "MEAN_BAIT_COVERAGE",
+            "MEAN_TARGET_COVERAGE", "MEDIAN_TARGET_COVERAGE", "PCT_USABLE_BASES_ON_BAIT", "PCT_USABLE_BASES_ON_TARGET", "FOLD_ENRICHMENT",
+            "ZERO_CVG_TARGETS_PCT", "PCT_EXC_DUPE", "PCT_EXC_MAPQ", "PCT_EXC_BASEQ", "PCT_EXC_OVERLAP", "PCT_EXC_OFF_TARGET",
+            "FOLD_80_BASE_PENALTY", "PCT_TARGET_BASES_1X", "PCT_TARGET_BASES_2X", "PCT_TARGET_BASES_10X", "PCT_TARGET_BASES_20X",
+            "PCT_TARGET_BASES_30X", "PCT_TARGET_BASES_40X", "PCT_TARGET_BASES_50X", "PCT_TARGET_BASES_100X", "HS_LIBRARY_SIZE",
+            "HS_PENALTY_10X", "HS_PENALTY_20X", "HS_PENALTY_30X", "HS_PENALTY_40X", "HS_PENALTY_50X", "HS_PENALTY_100X", "AT_DROPOUT",
+            "GC_DROPOUT", "HET_SNP_SENSITIVITY", "HET_SNP_Q");
 
     private Long sampleId;
 
@@ -47,8 +47,12 @@ public class SaveCollectHsMetricsAttributesRunnable implements Runnable {
 
     private MaPSeqDAOBeanService mapseqDAOBeanService;
 
-    public SaveCollectHsMetricsAttributesRunnable() {
+    private WorkflowRun workflowRun;
+
+    public SaveCollectHsMetricsAttributesRunnable(MaPSeqDAOBeanService mapseqDAOBeanService, WorkflowRun workflowRun) {
         super();
+        this.mapseqDAOBeanService = mapseqDAOBeanService;
+        this.workflowRun = workflowRun;
     }
 
     @Override
@@ -76,7 +80,7 @@ public class SaveCollectHsMetricsAttributesRunnable implements Runnable {
 
             for (Sample sample : sampleSet) {
 
-                File workflowDir = new File(sample.getOutputDirectory(), "NCGenesVCFCompare");
+                File workflowDir = SequencingWorkflowUtil.createOutputDirectory(sample, workflowRun.getWorkflow());
 
                 Set<Attribute> attributeSet = sample.getAttributes();
 
@@ -87,8 +91,7 @@ public class SaveCollectHsMetricsAttributesRunnable implements Runnable {
 
                 Set<String> synchSet = Collections.synchronizedSet(attributeNameSet);
 
-                Collection<File> fileList = FileUtils.listFiles(workflowDir,
-                        FileFilterUtils.suffixFileFilter(".hs.metrics"), null);
+                Collection<File> fileList = FileUtils.listFiles(workflowDir, FileFilterUtils.suffixFileFilter(".hs.metrics"), null);
 
                 if (CollectionUtils.isNotEmpty(fileList)) {
                     File metricsFile = fileList.iterator().next();
@@ -157,6 +160,14 @@ public class SaveCollectHsMetricsAttributesRunnable implements Runnable {
 
     public void setMapseqDAOBeanService(MaPSeqDAOBeanService mapseqDAOBeanService) {
         this.mapseqDAOBeanService = mapseqDAOBeanService;
+    }
+
+    public WorkflowRun getWorkflowRun() {
+        return workflowRun;
+    }
+
+    public void setWorkflowRun(WorkflowRun workflowRun) {
+        this.workflowRun = workflowRun;
     }
 
 }
