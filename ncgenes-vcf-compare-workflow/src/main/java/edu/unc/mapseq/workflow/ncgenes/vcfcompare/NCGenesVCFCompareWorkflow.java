@@ -18,8 +18,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import edu.unc.mapseq.commons.ncgenes.vcfcompare.RegisterToIRODSRunnable;
-import edu.unc.mapseq.commons.ncgenes.vcfcompare.SaveCollectHsMetricsAttributesRunnable;
-import edu.unc.mapseq.config.MaPSeqConfigurationService;
 import edu.unc.mapseq.dao.MaPSeqDAOBeanService;
 import edu.unc.mapseq.dao.model.Attribute;
 import edu.unc.mapseq.dao.model.Flowcell;
@@ -35,7 +33,6 @@ import edu.unc.mapseq.module.sequencing.picard.PicardMarkDuplicatesCLI;
 import edu.unc.mapseq.module.sequencing.picard.PicardSortOrderType;
 import edu.unc.mapseq.module.sequencing.picard2.PicardAddOrReplaceReadGroupsCLI;
 import edu.unc.mapseq.module.sequencing.picard2.PicardCollectHsMetricsCLI;
-import edu.unc.mapseq.workflow.SystemType;
 import edu.unc.mapseq.workflow.WorkflowException;
 import edu.unc.mapseq.workflow.sequencing.AbstractSequencingWorkflow;
 import edu.unc.mapseq.workflow.sequencing.SequencingWorkflowJobFactory;
@@ -47,16 +44,6 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
 
     public NCGenesVCFCompareWorkflow() {
         super();
-    }
-
-    @Override
-    public String getName() {
-        return NCGenesVCFCompareWorkflow.class.getSimpleName().replace("Workflow", "");
-    }
-
-    @Override
-    public SystemType getSystem() {
-        return SystemType.EXPERIMENTAL;
     }
 
     @Override
@@ -100,7 +87,7 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
             logger.debug(sample.toString());
 
             Flowcell flowcell = sample.getFlowcell();
-            File workflowDirectory = new File(sample.getOutputDirectory(), getName());
+            File workflowDirectory = SequencingWorkflowUtil.createOutputDirectory(sample, workflowRun.getWorkflow());
             File tmpDirectory = new File(workflowDirectory, "tmp");
             tmpDirectory.mkdirs();
 
@@ -208,7 +195,8 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                 // new job
                 builder = SequencingWorkflowJobFactory.createJob(++count, PicardCollectHsMetricsCLI.class, attempt.getId(), sample.getId())
                         .siteName(siteName);
-                File picardCollectHsMetricsFile = new File(workflowDirectory, picardCollectHsMetricsInputFile.getName().replace(".bam", ".hs.metrics"));
+                File picardCollectHsMetricsFile = new File(workflowDirectory,
+                        picardCollectHsMetricsInputFile.getName().replace(".bam", ".hs.metrics"));
                 builder.addArgument(PicardCollectHsMetricsCLI.INPUT, picardCollectHsMetricsInputFile.getAbsolutePath())
                         .addArgument(PicardCollectHsMetricsCLI.OUTPUT, picardCollectHsMetricsFile.getAbsolutePath())
                         .addArgument(PicardCollectHsMetricsCLI.REFERENCESEQUENCE, referenceSequence)
@@ -276,8 +264,7 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
                     continue;
                 }
 
-                RegisterToIRODSRunnable registerToIRODSRunnable = new RegisterToIRODSRunnable(daoBean, getSystem(), workflowRun.getName(),
-                        includeMarkDuplicates);
+                RegisterToIRODSRunnable registerToIRODSRunnable = new RegisterToIRODSRunnable(daoBean, workflowRun, includeMarkDuplicates);
                 registerToIRODSRunnable.setSampleId(sample.getId());
                 es.submit(registerToIRODSRunnable);
 
