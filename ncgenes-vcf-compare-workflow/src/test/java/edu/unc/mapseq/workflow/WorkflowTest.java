@@ -38,35 +38,30 @@ public class WorkflowTest {
     @Test
     public void createDot() {
 
-        DirectedGraph<CondorJob, CondorJobEdge> graph = new DefaultDirectedGraph<CondorJob, CondorJobEdge>(
-                CondorJobEdge.class);
+        DirectedGraph<CondorJob, CondorJobEdge> graph = new DefaultDirectedGraph<CondorJob, CondorJobEdge>(CondorJobEdge.class);
 
         int count = 0;
 
         // new job
-        CondorJob writeVCFHeaderJob = new CondorJobBuilder()
-                .name(String.format("%s_%d", WriteVCFHeaderCLI.class.getSimpleName(), ++count)).build();
+        CondorJob writeVCFHeaderJob = new CondorJobBuilder().name(String.format("%s_%d", WriteVCFHeaderCLI.class.getSimpleName(), ++count))
+                .build();
         graph.addVertex(writeVCFHeaderJob);
 
         // new job
-        CondorJob fastQCR1Job = new CondorJobBuilder()
-                .name(String.format("%s_%d", FastQCCLI.class.getSimpleName(), ++count)).build();
+        CondorJob fastQCR1Job = new CondorJobBuilder().name(String.format("%s_%d", FastQCCLI.class.getSimpleName(), ++count)).build();
         graph.addVertex(fastQCR1Job);
 
         // new job
-        CondorJob bwaAlignR1Job = new CondorJobBuilder()
-                .name(String.format("%s_%d", BWAAlignCLI.class.getSimpleName(), ++count)).build();
+        CondorJob bwaAlignR1Job = new CondorJobBuilder().name(String.format("%s_%d", BWAAlignCLI.class.getSimpleName(), ++count)).build();
         graph.addVertex(bwaAlignR1Job);
         graph.addEdge(fastQCR1Job, bwaAlignR1Job);
 
         // new job
-        CondorJob fastQCR2Job = new CondorJobBuilder()
-                .name(String.format("%s_%d", FastQCCLI.class.getSimpleName(), ++count)).build();
+        CondorJob fastQCR2Job = new CondorJobBuilder().name(String.format("%s_%d", FastQCCLI.class.getSimpleName(), ++count)).build();
         graph.addVertex(fastQCR2Job);
 
         // new job
-        CondorJob bwaAlignR2Job = new CondorJobBuilder()
-                .name(String.format("%s_%d", BWAAlignCLI.class.getSimpleName(), ++count)).build();
+        CondorJob bwaAlignR2Job = new CondorJobBuilder().name(String.format("%s_%d", BWAAlignCLI.class.getSimpleName(), ++count)).build();
         graph.addVertex(bwaAlignR2Job);
         graph.addEdge(fastQCR2Job, bwaAlignR2Job);
 
@@ -84,8 +79,8 @@ public class WorkflowTest {
         graph.addEdge(bwaSAMPairedEndJob, picardAddOrReplaceReadGroupsJob);
 
         // new job
-        CondorJob samtoolsIndexJob = new CondorJobBuilder()
-                .name(String.format("%s_%d", SAMToolsIndexCLI.class.getSimpleName(), ++count)).build();
+        CondorJob samtoolsIndexJob = new CondorJobBuilder().name(String.format("%s_%d", SAMToolsIndexCLI.class.getSimpleName(), ++count))
+                .build();
         graph.addVertex(samtoolsIndexJob);
         graph.addEdge(picardAddOrReplaceReadGroupsJob, samtoolsIndexJob);
 
@@ -96,8 +91,7 @@ public class WorkflowTest {
         graph.addEdge(samtoolsIndexJob, picardMarkDuplicatesJob);
 
         // new job
-        samtoolsIndexJob = new CondorJobBuilder()
-                .name(String.format("%s_%d", SAMToolsIndexCLI.class.getSimpleName(), ++count)).build();
+        samtoolsIndexJob = new CondorJobBuilder().name(String.format("%s_%d", SAMToolsIndexCLI.class.getSimpleName(), ++count)).build();
         graph.addVertex(samtoolsIndexJob);
         graph.addEdge(picardMarkDuplicatesJob, samtoolsIndexJob);
 
@@ -114,14 +108,13 @@ public class WorkflowTest {
         graph.addEdge(gatkRealignTargetCreatorJob, gatkIndelRealignerJob);
 
         // new job
-        CondorJob picardFixMateJob = new CondorJobBuilder()
-                .name(String.format("%s_%d", PicardFixMateCLI.class.getSimpleName(), ++count)).build();
+        CondorJob picardFixMateJob = new CondorJobBuilder().name(String.format("%s_%d", PicardFixMateCLI.class.getSimpleName(), ++count))
+                .build();
         graph.addVertex(picardFixMateJob);
         graph.addEdge(gatkIndelRealignerJob, picardFixMateJob);
 
         // new job
-        samtoolsIndexJob = new CondorJobBuilder()
-                .name(String.format("%s_%d", SAMToolsIndexCLI.class.getSimpleName(), ++count)).build();
+        samtoolsIndexJob = new CondorJobBuilder().name(String.format("%s_%d", SAMToolsIndexCLI.class.getSimpleName(), ++count)).build();
         graph.addVertex(samtoolsIndexJob);
         graph.addEdge(picardFixMateJob, samtoolsIndexJob);
 
@@ -138,8 +131,7 @@ public class WorkflowTest {
         graph.addEdge(gatkCountCovariatesJob, gatkTableRecalibrationJob);
 
         // new job
-        samtoolsIndexJob = new CondorJobBuilder()
-                .name(String.format("%s_%d", SAMToolsIndexCLI.class.getSimpleName(), ++count)).build();
+        samtoolsIndexJob = new CondorJobBuilder().name(String.format("%s_%d", SAMToolsIndexCLI.class.getSimpleName(), ++count)).build();
         graph.addVertex(samtoolsIndexJob);
         graph.addEdge(gatkTableRecalibrationJob, samtoolsIndexJob);
 
@@ -150,8 +142,8 @@ public class WorkflowTest {
         graph.addEdge(samtoolsIndexJob, samtoolsFlagstatJob);
 
         // new job
-        CondorJob gatkFlagstatJob = new CondorJobBuilder()
-                .name(String.format("%s_%d", GATKFlagStatCLI.class.getSimpleName(), ++count)).build();
+        CondorJob gatkFlagstatJob = new CondorJobBuilder().name(String.format("%s_%d", GATKFlagStatCLI.class.getSimpleName(), ++count))
+                .build();
         graph.addVertex(gatkFlagstatJob);
         graph.addEdge(samtoolsIndexJob, gatkFlagstatJob);
 
@@ -169,8 +161,8 @@ public class WorkflowTest {
         graph.addEdge(gatkDepthOfCoverageJob, gatkUnifiedGenotyperJob);
 
         // new job
-        CondorJob filterVariant1Job = new CondorJobBuilder()
-                .name(String.format("%s_%d", FilterVariantCLI.class.getSimpleName(), ++count)).build();
+        CondorJob filterVariant1Job = new CondorJobBuilder().name(String.format("%s_%d", FilterVariantCLI.class.getSimpleName(), ++count))
+                .build();
         graph.addVertex(filterVariant1Job);
         graph.addEdge(gatkUnifiedGenotyperJob, filterVariant1Job);
 
@@ -187,8 +179,8 @@ public class WorkflowTest {
         graph.addEdge(gatkVariantRecalibratorJob, gatkApplyRecalibrationJob);
 
         CondorJobVertexNameProvider vnp = new CondorJobVertexNameProvider();
-        CondorDOTExporter<CondorJob, CondorJobEdge> dotExporter = new CondorDOTExporter<CondorJob, CondorJobEdge>(vnp,
-                vnp, null, null, null, null);
+        CondorDOTExporter<CondorJob, CondorJobEdge> dotExporter = new CondorDOTExporter<CondorJob, CondorJobEdge>(vnp, vnp, null, null,
+                null, null);
         File srcSiteResourcesImagesDir = new File("../src/site/resources/images");
         if (!srcSiteResourcesImagesDir.exists()) {
             srcSiteResourcesImagesDir.mkdirs();
