@@ -128,14 +128,14 @@ public class RegisterToIRODSRunnable implements Runnable {
             List<ImmutablePair<String, String>> attributeListWithJob = new ArrayList<>(attributeList);
             attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqJobName", FastQC.class.getSimpleName()));
             attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqMimeType", MimeType.APPLICATION_ZIP.toString()));
-            files2RegisterToIRODS.add(
-                    new IRODSBean(new File(outputDirectory, String.format("%s.r1.fastqc.zip", workflowRun.getName())), attributeListWithJob));
+            files2RegisterToIRODS.add(new IRODSBean(new File(outputDirectory, String.format("%s.r1.fastqc.zip", workflowRun.getName())),
+                    attributeListWithJob));
 
             attributeListWithJob = new ArrayList<>(attributeList);
             attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqJobName", FastQC.class.getSimpleName()));
             attributeListWithJob.add(new ImmutablePair<String, String>("MaPSeqMimeType", MimeType.APPLICATION_ZIP.toString()));
-            files2RegisterToIRODS.add(
-                    new IRODSBean(new File(outputDirectory, String.format("%s.r2.fastqc.zip", workflowRun.getName())), attributeListWithJob));
+            files2RegisterToIRODS.add(new IRODSBean(new File(outputDirectory, String.format("%s.r2.fastqc.zip", workflowRun.getName())),
+                    attributeListWithJob));
 
             String file = String.format("%s.mem.rg.bam", workflowRun.getName());
 

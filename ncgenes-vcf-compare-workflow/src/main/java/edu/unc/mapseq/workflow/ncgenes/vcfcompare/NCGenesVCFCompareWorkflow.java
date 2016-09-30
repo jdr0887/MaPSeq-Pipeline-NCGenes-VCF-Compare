@@ -54,7 +54,8 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
 
         int count = 0;
 
-        Set<Sample> sampleSet = getAggregatedSamples();
+        Set<Sample> sampleSet = SequencingWorkflowUtil.getAggregatedSamples(getWorkflowBeanService().getMaPSeqDAOBeanService(),
+                getWorkflowRunAttempt());
         logger.info("sampleSet.size(): {}", sampleSet.size());
 
         String siteName = getWorkflowBeanService().getAttributes().get("siteName");
@@ -240,7 +241,8 @@ public class NCGenesVCFCompareWorkflow extends AbstractSequencingWorkflow {
     public void postRun() throws WorkflowException {
         logger.debug("ENTERING postRun()");
 
-        Set<Sample> sampleSet = getAggregatedSamples();
+        Set<Sample> sampleSet = SequencingWorkflowUtil.getAggregatedSamples(getWorkflowBeanService().getMaPSeqDAOBeanService(),
+                getWorkflowRunAttempt());
 
         WorkflowRun workflowRun = getWorkflowRunAttempt().getWorkflowRun();
         Boolean includeMarkDuplicates = Boolean.FALSE;
